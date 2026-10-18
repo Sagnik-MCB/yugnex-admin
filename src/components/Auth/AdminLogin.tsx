@@ -17,11 +17,11 @@ export default function AdminLogin() {
     setLoading(true)
     try {
       const { data } = await adminLogin(form)
-      if (!data.is_admin) {
+      if (!data.user?.is_admin) {
         setError('Access denied. Admin privileges required.')
         return
       }
-      login(data.access_token, data)
+      login(data.token, data.user)
       nav('/pulse')
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } } }
