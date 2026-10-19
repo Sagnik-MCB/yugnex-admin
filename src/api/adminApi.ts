@@ -56,4 +56,29 @@ export const getAdminTransactions = () => api.get('/admin/transactions')
 export const getAdminLive = () => api.get('/admin/live')
 export const deleteAdminLive = (id: string) => api.delete(`/admin/live/${id}`)
 
+// Communities
+export const getAdminCommunities = (params?: { q?: string; page?: number }) =>
+  api.get('/admin/communities', { params })
+export const updateAdminCommunity = (id: string, data: Record<string, unknown>) =>
+  api.patch(`/admin/communities/${id}`, null, { params: data })
+
+// System
+export const getAdminSystem = () => api.get('/admin/system')
+
+// Analytics
+export const getAdminAnalytics = () => api.get('/admin/analytics')
+
+// Support tickets
+export const getAdminSupport = (params?: { status?: string; q?: string; page?: number }) =>
+  api.get('/admin/support', { params })
+export const createAdminTicket = (data: { subject: string; category: string; user_id?: number; priority?: string; notes?: string }) =>
+  api.post('/admin/support', data)
+export const updateAdminTicket = (id: string, data: Record<string, unknown>) =>
+  api.patch(`/admin/support/${id}`, data)
+
+// Access
+export const getAdminAccess = () => api.get('/admin/access')
+export const updateAdminAccess = (id: string, data: { is_admin?: boolean; is_banned?: boolean }) =>
+  api.patch(`/admin/access/${id}`, data)
+
 export default api

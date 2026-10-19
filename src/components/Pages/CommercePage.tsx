@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { getAdminMarketplace, getAdminTransactions } from '../../api/adminApi'
+import { getAdminMarketplace } from '../../api/adminApi'
+import { useAdminAuth } from '../../context/AdminAuthContext'
 import Icon from '../Icon'
 
 interface MarketItem {
@@ -12,108 +13,163 @@ interface MarketItem {
   is_active: boolean
 }
 
-interface Transaction {
-  id: string
-  username: string
-  description: string
-  amount_inr: number
-  created_at: string
-  type: string
-}
+const staticMetrics: [string, string, string][] = [
+  ['GMV today', '₹6.42 Cr', '+24.1%'],
+  ['Disputes', '84', '0.18% of orders'],
+  ['Payout holds', '₹18.2L', '32 sellers'],
+]
 
-const bars = [35, 68, 48, 82, 64, 91]
+const staticActions = ['Approve refund', 'Restrict listing', 'Hold payout', 'Release payout']
 
 export default function CommercePage() {
+  const { user } = useAdminAuth()
   const [items, setItems] = useState<MarketItem[]>([])
-  const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [tab, setTab] = useState<'items' | 'transactions'>('items')
-  const [loading, setLoading] = useState(true)
+  const [query, setQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('All')
+  const [selectedName, setSelectedName] = useState('')
+  const [action, setAction] = useState<null | { label: string; target: string; danger: boolean }>(null)
+  const [reason, setReason] = useState('')
+  const [audit, setAudit] = useState<{ action: string; target: string; time: string }[]>([])
 
   useEffect(() => {
-    if (tab === 'items') {
-      setLoading(true)
-      getAdminMarketplace().then(r => setItems(r.data.items ?? [])).catch(() => {}).finally(() => setLoading(false))
-    } else {
-      setLoading(true)
-      getAdminTransactions().then(r => setTransactions(r.data.transactions ?? [])).catch(() => {}).finally(() => setLoading(false))
-    }
-  }, [tab])
+    getAdminMarketplace().then(r => setItems(r.data.items ?? [])).catch(() => {})
+  }, [])
+
+  const toRecord = (item: MarketItem) => ({
+    name: item.title,
+    meta: `by @${item.username} · ${item.category}`,
+    status: item.is_active ? 'Healthy' : 'Review',
+    signal: `${item.price_coins} coins · ${item.sales_count ?? 0} sales`,
+    detail: `Seller: @${item.username} · Category: ${item.category} · Sales: ${item.sales_count ?? 0} · Active: ${item.is_active ? 'Yes' : 'No'}`,
+  })
+
+  const allRecords = items.map(toRecord)
+  const records = allRecords.filter(item =>
+    (statusFilter === 'All' || item.status === statusFilter) &&
+    `${item.name} ${item.meta} ${item.signal}`.toLowerCase().includes(query.toLowerCase())
+  )
+  const selected = records.find(item => item.name === selectedName) || records[0] || allRecords[0]
+  const statuses = ['All', ...Array.from(new Set(allRecords.map(item => item.status)))]
+
+  const confirmAction = (label: string, target: string, danger = true) => { setReason(''); setAction({ label, target, danger }) }
+  const completeAction = () => {
+    if (!action || reason.trim().length < 8) return
+    setAudit(items => [{ action: action.label, target: action.target, time: `Just now · ${user?.display_name ?? 'Admin'}` }, ...items])
+    setAction(null)
+    setReason('')
+  }
 
   return (
     <div className="admin-page admin-in">
       <section className="admin-intro compact">
         <div>
-          <span className="overline">Marketplace &amp; commerce</span>
-          <h1>Commerce<br/><em>with clarity.</em></h1>
+          <span className="overline">Money movement</span>
+          <h1>Commerce,<br/><em>protected.</em></h1>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {(['items', 'transactions'] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)}
-              style={{ padding: '9px 16px', border: '1px solid rgba(17,17,15,.14)', borderRadius: 99, background: tab === t ? '#11110f' : 'transparent', color: tab === t ? 'white' : '#11110f', fontSize: 9, cursor: 'pointer', textTransform: 'capitalize' }}>
-              {t}
-            </button>
-          ))}
-        </div>
+        <p>Review listings, orders, refunds, disputes, fraud signals, seller standing, and payout health.</p>
       </section>
 
-      {loading ? (
-        <p style={{ color: '#777', textAlign: 'center', padding: 40 }}>Loading…</p>
-      ) : tab === 'items' ? (
-        <div className="admin-table">
-          <header>
-            <span>Item</span>
-            <span>Status</span>
-            <span>Price</span>
-            <span>Signal</span>
-            <span />
-          </header>
-          {items.map((item, index) => (
-            <div key={item.id}>
+      <div className="admin-summary">
+        {staticMetrics.map(item => (
+          <article key={item[0]}>
+            <span>{item[0]}</span>
+            <strong>{item[1]}</strong>
+            <small>{item[2]}</small>
+          </article>
+        ))}
+      </div>
+
+      <div className="admin-toolbar">
+        <label>
+          <Icon name="search" size={14} />
+          <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search commerce" />
+        </label>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} aria-label="Filter commerce by status">
+          {statuses.map(s => <option key={s}>{s}</option>)}
+        </select>
+        <button><Icon name="bookmark" size={14} />Save view</button>
+      </div>
+
+      <div className="admin-operations">
+        <section className="admin-records" aria-label="Commerce records">
+          <header><span>Record</span><span>Status</span><span>Signal</span><span /></header>
+          {records.length ? records.map((item, index) => (
+            <button key={item.name} className={selected?.name === item.name ? 'selected' : ''} onClick={() => setSelectedName(item.name)}>
               <span>
-                <span className={`person tone-${index % 5}`}>{item.title?.charAt(0) ?? '?'}</span>
-                <div>
-                  <strong>{item.title}</strong>
-                  <div style={{ fontSize: 8, color: '#777', marginTop: 2 }}>by @{item.username}</div>
-                </div>
+                <span className={`person tone-${index % 5}`}>{item.name.charAt(0)}</span>
+                <span><strong>{item.name}</strong><small>{item.meta}</small></span>
               </span>
-              <span>
-                <i style={{ background: item.is_active ? '#21855b' : '#777' }} />
-                {item.is_active ? 'Active' : 'Inactive'}
-              </span>
-              <span>{item.price_coins} coins</span>
-              <span className="micro-bars">
-                {bars.map((h, i) => <i key={i} style={{ height: `${h}%`, animationDelay: `${i * 0.08}s` }} />)}
-              </span>
-              <button><Icon name="more" size={16} /></button>
+              <b>{item.status}</b>
+              <em>{item.signal}</em>
+              <Icon name="arrow" size={14} />
+            </button>
+          )) : (
+            <div className="admin-empty">
+              <Icon name="search" size={28} />
+              <strong>No matching records</strong>
+              <small>Clear the search or choose another status.</small>
+              <button onClick={() => { setQuery(''); setStatusFilter('All') }}>Clear filters</button>
             </div>
-          ))}
-          {items.length === 0 && <p style={{ padding: '40px 10px', color: '#777', textAlign: 'center' }}>No items found</p>}
-        </div>
-      ) : (
-        <div className="admin-table">
-          <header>
-            <span>Buyer</span>
-            <span>Status</span>
-            <span>Amount</span>
-            <span>Date</span>
-            <span />
-          </header>
-          {transactions.map((t, index) => (
-            <div key={t.id}>
-              <span>
-                <span className={`person tone-${index % 5}`}>{t.username?.charAt(0) ?? '?'}</span>
-                <div>
-                  <strong>@{t.username}</strong>
-                  <div style={{ fontSize: 8, color: '#777', marginTop: 2 }}>{t.description}</div>
-                </div>
-              </span>
-              <span><i />{t.type}</span>
-              <span>₹{t.amount_inr.toLocaleString()}</span>
-              <span>{new Date(t.created_at).toLocaleDateString('en-IN')}</span>
-              <button><Icon name="more" size={16} /></button>
+          )}
+        </section>
+
+        {selected && (
+          <aside className="admin-inspector">
+            <span>INSPECTING</span>
+            <h2>{selected.name}</h2>
+            <p>{selected.meta}</p>
+            <div className="inspector-status">
+              <b>{selected.status}</b>
+              <strong>{selected.signal}</strong>
             </div>
-          ))}
-          {transactions.length === 0 && <p style={{ padding: '40px 10px', color: '#777', textAlign: 'center' }}>No transactions found</p>}
+            <section>
+              <span>CONTEXT</span>
+              <p>{selected.detail}</p>
+            </section>
+            <section>
+              <span>AVAILABLE ACTIONS</span>
+              {staticActions.map((label, index) => (
+                <button key={label} onClick={() => confirmAction(label, selected.name, index > 0)}>
+                  <Icon name={index === 0 ? 'check' : index === 1 ? 'shield' : 'settings'} size={14} />
+                  <span>{label}</span>
+                  <Icon name="arrow" size={14} />
+                </button>
+              ))}
+            </section>
+          </aside>
+        )}
+      </div>
+
+      <section className="admin-audit">
+        <header>
+          <strong>Session audit trail</strong>
+          <span>{audit.length} actions · {user?.display_name ?? 'Admin'}</span>
+        </header>
+        {audit.length ? audit.map((item, index) => (
+          <article key={`${item.action}-${index}`}>
+            <Icon name="check" size={14} />
+            <span><strong>{item.action}</strong><small>{item.target} · {item.time}</small></span>
+          </article>
+        )) : <p>No privileged actions in this session.</p>}
+      </section>
+
+      {action && (
+        <div className="admin-modal-backdrop">
+          <section className="admin-confirm" role="alertdialog" aria-modal="true" aria-labelledby="admin-action-title">
+            <Icon name={action.danger ? 'shield' : 'check'} size={30} />
+            <span>PRIVILEGED ACTION</span>
+            <h2 id="admin-action-title">{action.label}</h2>
+            <p><strong>Target:</strong> {action.target}</p>
+            <label>REQUIRED REASON
+              <textarea value={reason} onChange={e => setReason(e.target.value)}
+                placeholder="Reference the policy, evidence, and intended outcome." maxLength={500} />
+              <small>{reason.length} / 500 · Minimum 8 characters</small>
+            </label>
+            <div>
+              <button data-dialog-cancel onClick={() => setAction(null)}>Cancel</button>
+              <button className={action.danger ? 'danger' : ''} disabled={reason.trim().length < 8} onClick={completeAction}>Confirm action</button>
+            </div>
+          </section>
         </div>
       )}
     </div>

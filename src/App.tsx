@@ -9,6 +9,9 @@ import ContentPage from './components/Pages/ContentPage'
 import CreatorsPage from './components/Pages/CreatorsPage'
 import CommercePage from './components/Pages/CommercePage'
 import CommunitiesPage from './components/Pages/CommunitiesPage'
+import AnalyticsPage from './components/Pages/AnalyticsPage'
+import SupportPage from './components/Pages/SupportPage'
+import AccessPage from './components/Pages/AccessPage'
 import SystemPage from './components/Pages/SystemPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -33,6 +36,9 @@ function AppRoutes() {
         <Route path="/creators"    element={<CreatorsPage />} />
         <Route path="/commerce"    element={<CommercePage />} />
         <Route path="/communities" element={<CommunitiesPage />} />
+        <Route path="/analytics"   element={<AnalyticsPage />} />
+        <Route path="/support"     element={<SupportPage />} />
+        <Route path="/access"      element={<AccessPage />} />
         <Route path="/system"      element={<SystemPage />} />
       </Route>
       <Route path="*" element={<Navigate to={isAuthed ? '/pulse' : '/login'} replace />} />

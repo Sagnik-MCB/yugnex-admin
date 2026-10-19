@@ -10,6 +10,9 @@ const navItems: [string, string, Parameters<typeof Icon>[0]['name'], number?][] 
   ['/creators',    'Creators',    'spark'],
   ['/commerce',    'Commerce',    'money'],
   ['/communities', 'Communities', 'chat'],
+  ['/analytics',   'Analytics',   'chart'],
+  ['/support',     'Support',     'chat'],
+  ['/access',      'Access',      'lock'],
   ['/system',      'System',      'settings'],
 ]
 

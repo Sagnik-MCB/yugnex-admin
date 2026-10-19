@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getAdminReports, resolveReport } from '../../api/adminApi'
+import { useAdminAuth } from '../../context/AdminAuthContext'
 import Icon from '../Icon'
 
 interface Report {
@@ -12,33 +13,62 @@ interface Report {
   resolved_at: string | null
 }
 
-const SEVERITY_CLASS: Record<string, string> = {
-  spam: 's-3',
-  harassment: 's-1',
-  impersonation: 's-0',
-  hate_speech: 's-0',
-  misinformation: 's-1',
-  copyright: 's-2',
-}
+const severityLabels = ['Critical', 'High', 'Medium', 'Low']
 
 export default function SafetyPage() {
+  const { user } = useAdminAuth()
   const [reports, setReports] = useState<Report[]>([])
-  const [selected, setSelected] = useState<Report | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [query, setQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('All')
+  const [selectedName, setSelectedName] = useState('')
+  const [action, setAction] = useState<null | { label: string; target: string; danger: boolean; reportId?: string; apiAction?: string }>(null)
+  const [reason, setReason] = useState('')
+  const [audit, setAudit] = useState<{ action: string; target: string; time: string }[]>([])
 
   useEffect(() => {
     getAdminReports({ status: 'pending' })
       .then(r => setReports(r.data.reports ?? []))
       .catch(() => {})
-      .finally(() => setLoading(false))
   }, [])
 
-  const handleResolve = async (id: string, action: string) => {
-    try {
-      await resolveReport(id, { action })
-      setReports(prev => prev.filter(r => r.id !== id))
-      if (selected?.id === id) setSelected(null)
-    } catch {}
+  const toCases = (rpts: Report[]) => rpts.map((r, i) => ({
+    id: r.id,
+    severity: severityLabels[i % 4],
+    name: `Reported post by @${r.post_author}`,
+    meta: `Reporter: @${r.reporter_username}`,
+    age: new Date(r.reported_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+    policy: 'Community standards · Content review',
+    evidence: r.post_content ? `"${r.post_content.slice(0, 80)}${r.post_content.length > 80 ? '…' : ''}"` : 'No content available',
+  }))
+
+  const allCases = toCases(reports)
+  const filteredCases = allCases.filter(item =>
+    (statusFilter === 'All' || item.severity === statusFilter) &&
+    `${item.name} ${item.meta}`.toLowerCase().includes(query.toLowerCase())
+  )
+  const selectedCase = filteredCases.find(item => item.name === selectedName) || filteredCases[0] || allCases[0]
+
+  const confirmAction = (label: string, target: string, danger = true, reportId?: string, apiAction?: string) => {
+    setReason('')
+    setAction({ label, target, danger, reportId, apiAction })
+  }
+  const completeAction = async () => {
+    if (!action || reason.trim().length < 8) return
+    if (action.reportId && action.apiAction) {
+      try {
+        await resolveReport(action.reportId, { action: action.apiAction })
+        setReports(prev => prev.filter(r => r.id !== action.reportId))
+        if (selectedCase?.name === action.target) setSelectedName('')
+      } catch {}
+    }
+    setAudit(items => [{ action: action.label, target: action.target, time: `Just now · ${user?.display_name ?? 'Admin'}` }, ...items])
+    setAction(null)
+    setReason('')
+  }
+
+  const reportForCase = (caseName: string) => {
+    const idx = allCases.findIndex(c => c.name === caseName)
+    return reports[idx] ?? null
   }
 
   return (
@@ -48,89 +78,113 @@ export default function SafetyPage() {
           <span className="overline">Trust &amp; safety</span>
           <h1>Context before<br/><em>consequence.</em></h1>
         </div>
-        <p>Human judgment supported by transparent signals — not replaced by them.</p>
+        <p>Human judgment supported by transparent signals, policy references, evidence, and an auditable decision trail.</p>
       </section>
 
-      {loading ? (
-        <p style={{ color: '#777', textAlign: 'center', padding: 40 }}>Loading…</p>
-      ) : (
-        <div className="case-layout">
-          <section className="case-list">
-            <header>
-              <strong>Priority queue</strong>
-              <span>{reports.length} open</span>
-            </header>
-            {reports.length === 0 ? (
-              <div style={{ gridColumn: '1/-1', padding: '40px 0', textAlign: 'center', color: '#777' }}>
-                <Icon name="shield" size={36} />
-                <p style={{ marginTop: 12 }}>All clear — no pending reports</p>
-              </div>
-            ) : reports.slice(0, 4).map((r, i) => (
-              <article key={r.id} onClick={() => setSelected(r)} style={{ cursor: 'pointer', outline: selected?.id === r.id ? '2px solid #1648ff' : 'none' }}>
-                <div>
-                  <span className={`severity s-${i}`}>
-                    {['Critical', 'High', 'Medium', 'Low'][i] ?? 'Medium'}
-                  </span>
-                  <small>{new Date(r.reported_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</small>
-                </div>
-                <h2>Reported post</h2>
-                <p>by @{r.post_author} · reporter: @{r.reporter_username}</p>
-                <footer>
-                  <button onClick={e => { e.stopPropagation(); handleResolve(r.id, 'remove') }}>
-                    <Icon name="check" size={12} /> Resolve
-                  </button>
-                  <button onClick={e => { e.stopPropagation(); handleResolve(r.id, 'dismiss') }}>
-                    Dismiss
-                  </button>
-                </footer>
-              </article>
-            ))}
-          </section>
+      <div className="admin-toolbar">
+        <label>
+          <Icon name="search" size={14} />
+          <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search cases, accounts or policy" />
+        </label>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} aria-label="Filter by severity">
+          {['All', 'Critical', 'High', 'Medium', 'Low'].map(s => <option key={s}>{s}</option>)}
+        </select>
+        <button><Icon name="filter" size={14} />Saved views</button>
+      </div>
 
-          <aside className="decision-panel">
-            {selected ? (
-              <>
-                <div className="decision-symbol">
-                  <Icon name="shield" size={32} />
-                  <i /><i />
-                </div>
-                <span className="overline">Case detail</span>
-                <h2>Reported post</h2>
-                <p style={{ marginBottom: 16 }}>{selected.post_content || 'No content available.'}</p>
-                <p>Author: @{selected.post_author}<br/>Reporter: @{selected.reporter_username}</p>
-                <div>
-                  <span>Signal confidence</span>
-                  <strong>94.8%</strong>
-                  <i><b /></i>
-                </div>
-                <div style={{ display: 'flex', gap: 8, marginTop: 20, width: '100%' }}>
-                  <button onClick={() => handleResolve(selected.id, 'remove')}
-                    style={{ flex: 1, padding: '10px', border: 0, borderRadius: 99, background: '#11110f', color: 'white', fontSize: 9, cursor: 'pointer' }}>
-                    Remove content
-                  </button>
-                  <button onClick={() => handleResolve(selected.id, 'dismiss')}
-                    style={{ flex: 1, padding: '10px', border: '1px solid rgba(17,17,15,.3)', borderRadius: 99, background: 'transparent', fontSize: 9, cursor: 'pointer' }}>
-                    Dismiss
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="decision-symbol">
-                  <Icon name="shield" size={32} />
-                  <i /><i />
-                </div>
-                <span className="overline">Decision support</span>
-                <h2>Look at the whole story.</h2>
-                <p>Select a case to see full context, account relationships, and an explainable recommendation.</p>
-                <div>
-                  <span>Signal confidence</span>
-                  <strong>94.8%</strong>
-                  <i><b /></i>
-                </div>
-              </>
-            )}
+      <div className="case-layout">
+        <section className="case-list">
+          <header>
+            <strong>Priority queue</strong>
+            <span>{filteredCases.length} shown</span>
+          </header>
+          {filteredCases.length ? filteredCases.map((item, i) => (
+            <article key={item.id} className={selectedCase?.name === item.name ? 'selected' : ''}>
+              <div>
+                <span className={`severity s-${i}`}>{item.severity}</span>
+                <small>{item.age}</small>
+              </div>
+              <h2>{item.name}</h2>
+              <p>{item.meta}</p>
+              <footer>
+                <button onClick={() => confirmAction('Resolve safety case', item.name, true, item.id, 'remove')}>
+                  <Icon name="check" size={12} />Resolve
+                </button>
+                <button onClick={() => setSelectedName(item.name)}>Inspect context</button>
+              </footer>
+            </article>
+          )) : (
+            <div className="admin-empty case-empty">
+              <Icon name="search" size={28} />
+              <strong>No matching cases</strong>
+              <small>Clear the search or choose another severity.</small>
+              <button onClick={() => { setQuery(''); setStatusFilter('All') }}>Clear filters</button>
+            </div>
+          )}
+        </section>
+
+        {filteredCases.length > 0 && selectedCase && (
+          <aside className="decision-panel admin-case-detail">
+            <div className="decision-symbol">
+              <Icon name="shield" size={32} />
+              <i /><i />
+            </div>
+            <span className="overline">Case context</span>
+            <h2>{selectedCase.name}</h2>
+            <p>{selectedCase.meta}</p>
+            <dl>
+              <div><dt>Policy</dt><dd>{selectedCase.policy}</dd></div>
+              <div><dt>Evidence</dt><dd>{selectedCase.evidence}</dd></div>
+              <div><dt>Reviewer</dt><dd>Unassigned</dd></div>
+              <div><dt>Appeal</dt><dd>Available after decision</dd></div>
+            </dl>
+            <div>
+              <span>Signal confidence</span>
+              <strong>94.8%</strong>
+              <i><b /></i>
+            </div>
+            <button onClick={() => {
+              const r = reportForCase(selectedCase.name)
+              confirmAction('Escalate to senior reviewer', selectedCase.name, false, r?.id, 'escalate')
+            }}>
+              Escalate with context
+            </button>
           </aside>
+        )}
+      </div>
+
+      {audit.length > 0 && (
+        <section className="admin-audit">
+          <header>
+            <strong>Session audit trail</strong>
+            <span>Immutable in production</span>
+          </header>
+          {audit.map((item, index) => (
+            <article key={`${item.action}-${index}`}>
+              <Icon name="check" size={14} />
+              <span><strong>{item.action}</strong><small>{item.target} · {item.time}</small></span>
+            </article>
+          ))}
+        </section>
+      )}
+
+      {action && (
+        <div className="admin-modal-backdrop">
+          <section className="admin-confirm" role="alertdialog" aria-modal="true" aria-labelledby="admin-action-title">
+            <Icon name={action.danger ? 'shield' : 'check'} size={30} />
+            <span>PRIVILEGED ACTION</span>
+            <h2 id="admin-action-title">{action.label}</h2>
+            <p><strong>Target:</strong> {action.target}</p>
+            <label>REQUIRED REASON
+              <textarea value={reason} onChange={e => setReason(e.target.value)}
+                placeholder="Reference the policy, evidence, and intended outcome." maxLength={500} />
+              <small>{reason.length} / 500 · Minimum 8 characters</small>
+            </label>
+            <div>
+              <button data-dialog-cancel onClick={() => setAction(null)}>Cancel</button>
+              <button className={action.danger ? 'danger' : ''} disabled={reason.trim().length < 8} onClick={completeAction}>Confirm action</button>
+            </div>
+          </section>
         </div>
       )}
     </div>

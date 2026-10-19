@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import AdminSidebar from './AdminSidebar'
 import Icon from '../Icon'
+import { useAdminAuth } from '../../context/AdminAuthContext'
 
 const pageTitles: Record<string, string> = {
   '/pulse':       'Pulse',
@@ -11,6 +12,9 @@ const pageTitles: Record<string, string> = {
   '/creators':    'Creators',
   '/commerce':    'Commerce',
   '/communities': 'Communities',
+  '/analytics':   'Analytics',
+  '/support':     'Support',
+  '/access':      'Access',
   '/system':      'System',
 }
 
@@ -21,6 +25,7 @@ function getDate() {
 export default function AdminShell() {
   const { pathname } = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
+  const { user } = useAdminAuth()
   const title = pageTitles[pathname] ?? 'Admin'
 
   return (
@@ -51,6 +56,7 @@ export default function AdminShell() {
               <Icon name="bell" size={18} />
               <i />
             </button>
+            <span className="person tone-0">{(user?.display_name ?? 'A').charAt(0)}</span>
           </div>
         </header>
 
