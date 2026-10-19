@@ -22,7 +22,7 @@ api.interceptors.response.use(
 
 // Auth
 export const adminLogin = (data: { username: string; password: string }) =>
-  api.post('/auth/login', data)
+  api.post('/auth/login', { login: data.username, password: data.password })
 
 // Stats
 export const getAdminStats = () => api.get('/admin/stats')
