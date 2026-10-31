@@ -13,6 +13,7 @@ const navItems: [string, string, Parameters<typeof Icon>[0]['name'], number?][] 
   ['/analytics',   'Analytics',   'chart'],
   ['/support',     'Support',     'chat'],
   ['/access',      'Access',      'lock'],
+  ['/recovery',    'Recovery',    'camera'],
   ['/system',      'System',      'settings'],
 ]
 

@@ -81,4 +81,10 @@ export const getAdminAccess = () => api.get('/admin/access')
 export const updateAdminAccess = (id: string, data: { is_admin?: boolean; is_banned?: boolean }) =>
   api.patch(`/admin/access/${id}`, data)
 
+// Recovery requests (video selfie account recovery)
+export const getRecoveryRequests = (params?: { status?: string; page?: number }) =>
+  api.get('/admin/recovery-requests', { params })
+export const resolveRecoveryRequest = (id: string, data: { action: 'approve' | 'reject'; notes?: string }) =>
+  api.patch(`/admin/recovery-requests/${id}`, data)
+
 export default api

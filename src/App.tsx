@@ -13,6 +13,7 @@ import AnalyticsPage from './components/Pages/AnalyticsPage'
 import SupportPage from './components/Pages/SupportPage'
 import AccessPage from './components/Pages/AccessPage'
 import SystemPage from './components/Pages/SystemPage'
+import RecoveryPage from './components/Pages/RecoveryPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { token, user } = useAdminAuth()
@@ -40,6 +41,7 @@ function AppRoutes() {
         <Route path="/support"     element={<SupportPage />} />
         <Route path="/access"      element={<AccessPage />} />
         <Route path="/system"      element={<SystemPage />} />
+        <Route path="/recovery"    element={<RecoveryPage />} />
       </Route>
       <Route path="*" element={<Navigate to={isAuthed ? '/pulse' : '/login'} replace />} />
     </Routes>
