@@ -44,7 +44,8 @@ h1, h2, h3, p { margin-top: 0; }
 .admin-product { margin: 38px 0; }
 .admin-product span { color: #777; font-size: 7px; letter-spacing: .15em; }
 .admin-product strong { display: block; margin-top: 7px; font-family: 'Instrument Serif'; font-size: 30px; font-weight: 400; line-height: .85; }
-.admin-sidebar nav { display: flex; flex-direction: column; gap: 3px; flex: 1; overflow-y: auto; min-height: 0; }
+.admin-sidebar nav { display: flex; flex-direction: column; gap: 3px; flex: 1; overflow-y: auto; min-height: 0; scrollbar-width: none; }
+.admin-sidebar nav::-webkit-scrollbar { display: none; }
 .admin-sidebar nav button { display: flex; align-items: center; gap: 10px; padding: 10px; border: 0; border-radius: 7px; color: #888; background: transparent; font-size: 9px; text-align: left; transition: .2s ease; }
 .admin-sidebar nav button span { flex: 1; }
 .admin-sidebar nav button b { padding: 2px 6px; border-radius: 8px; color: white; background: var(--coral); font-size: 7px; }
